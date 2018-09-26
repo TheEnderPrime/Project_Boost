@@ -18,8 +18,10 @@ public class Rocket : MonoBehaviour {
 	[SerializeField] ParticleSystem finishChimeParticles;
 	[SerializeField] ParticleSystem deathExplosionParticles;
 
-	enum State {Alive, Dying, Transending}
-	State state = State.Alive;
+	bool isTransitioning = false;
+
+	bool collisionsDisabled = false;
+
 	// Use this for initialization
 	void Start () {
 		rigidBody = GetComponent<Rigidbody>();
@@ -28,10 +30,14 @@ public class Rocket : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-		if(state == State.Alive)
+		if(!isTransitioning)
 		{
 			RespondToThrustInput();
 			RespondToRotateInput();
+		}
+		if( Debug.isDebugBuild ) // allows only in development builds
+		{
+			RespondToDebugKeys();
 		}
 	}
 	
@@ -43,9 +49,14 @@ public class Rocket : MonoBehaviour {
         }
         else
         {
-            audioSource.Stop();
-			mainEngineParticles.Stop();
+            StopApplyingThrust();
         }
+    }
+
+    private void StopApplyingThrust()
+    {
+        audioSource.Stop();
+        mainEngineParticles.Stop();
     }
 
     private void ApplyThrust()
@@ -60,7 +71,7 @@ public class Rocket : MonoBehaviour {
 
     void RespondToRotateInput()
     {
-		rigidBody.freezeRotation = true;
+		rigidBody.angularVelocity = Vector3.zero;
 
         if (Input.GetKey(KeyCode.A))
         {
@@ -74,13 +85,24 @@ public class Rocket : MonoBehaviour {
         }
 
 		/*or float rotation = rotationspeed * time.delotaTime then transofrm.RespondToRotateInput(Vector3.forward *rotationSpeed) */
-
-		rigidBody.freezeRotation = false;
     }
+
+	void RespondToDebugKeys() 
+	{
+		if(Input.GetKey(KeyCode.L)) 
+		{
+			LoadNextLevel(); 
+		}
+
+		if(Input.GetKey(KeyCode.C))
+		{
+			collisionsDisabled = !collisionsDisabled;
+		}
+	}
 
 	 void OnCollisionEnter(Collision collision)
     {
-		if(state != State.Alive)
+		if(isTransitioning || collisionsDisabled)
 		{
 			return;
 		}
@@ -101,7 +123,7 @@ public class Rocket : MonoBehaviour {
 
 	private void StartSuccessSequence()
     {
-        state = State.Transending;
+        isTransitioning = true;
         audioSource.Stop();
         audioSource.PlayOneShot(finishChime);
 		mainEngineParticles.Stop();
@@ -111,7 +133,7 @@ public class Rocket : MonoBehaviour {
 
     private void StartDeathSequence()
     {
-        state = State.Dying;
+        isTransitioning = true;
         audioSource.Stop();
         audioSource.PlayOneShot(deathExplosion);
 		mainEngineParticles.Stop();
@@ -121,7 +143,15 @@ public class Rocket : MonoBehaviour {
 
     private void LoadNextLevel()
     {
-        SceneManager.LoadScene(1);
+		int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+        if(currentSceneIndex + 1 < SceneManager.sceneCountInBuildSettings)
+		{
+			SceneManager.LoadScene(currentSceneIndex + 1);
+		}
+		else 
+		{
+			LoadFirstLevel(); // todo build finish screen or victory screen
+		}
     }
 
 	private void LoadFirstLevel()
